@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.signal
-from gym.spaces import Box, Discrete
-
+from gymnasium.spaces import Box, Discrete
 import torch
 import torch.nn as nn
 from torch.distributions.normal import Normal
@@ -107,14 +106,14 @@ class MLPCritic(nn.Module):
 
 class MLPActorCritic(nn.Module):
 
-
-    def __init__(self, observation_space, action_space, 
-                 hidden_sizes=(64,64), activation=nn.Tanh):
+    def __init__(self, observation_space, action_space,
+             hidden_sizes=(64,64), activation=nn.Tanh):
+        print("--- LOADING MLPActorCritic FROM PPO/CORE.PY ---")   # <-- ADD THIS LINE
         super().__init__()
 
         obs_dim = observation_space.shape[0]
 
-        # policy builder depends on action space
+        # policy builder
         if isinstance(action_space, Box):
             self.pi = MLPGaussianActor(obs_dim, action_space.shape[0], hidden_sizes, activation)
         elif isinstance(action_space, Discrete):

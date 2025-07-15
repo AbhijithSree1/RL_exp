@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch.optim import Adam
-import gym
+import gymnasium as gym
 import time
 import spinup.algos.pytorch.ppo.core as core
 from spinup.utils.logx import EpochLogger
@@ -292,14 +292,19 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     # Prepare for interaction with environment
     start_time = time.time()
-    o, ep_ret, ep_len = env.reset(), 0, 0
+    # o, ep_ret, ep_len = env.reset(), 0, 0
+    (o, _), ep_ret, ep_len = env.reset(), 0, 0
+
+
 
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
         for t in range(local_steps_per_epoch):
             a, v, logp = ac.step(torch.as_tensor(o, dtype=torch.float32))
 
-            next_o, r, d, _ = env.step(a)
+            # next_o, r, d, _ = env.step(a)
+            next_o, r, terminated, truncated, _ = env.step(a)
+            d = terminated or truncated
             ep_ret += r
             ep_len += 1
 
@@ -326,7 +331,10 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
                     logger.store(EpRet=ep_ret, EpLen=ep_len)
-                o, ep_ret, ep_len = env.reset(), 0, 0
+                # o, ep_ret, ep_len = env.reset(), 0, 0
+                (o, _), ep_ret, ep_len = env.reset(), 0, 0
+
+
 
 
         # Save model

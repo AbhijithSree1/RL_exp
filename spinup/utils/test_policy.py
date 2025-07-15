@@ -6,6 +6,8 @@ import tensorflow as tf
 import torch
 from spinup import EpochLogger
 from spinup.utils.logx import restore_tf_graph
+import gymnasium as gym
+import json
 
 
 def load_policy_and_env(fpath, itr='last', deterministic=False):
@@ -53,13 +55,12 @@ def load_policy_and_env(fpath, itr='last', deterministic=False):
     else:
         get_action = load_pytorch_policy(fpath, itr, deterministic)
 
-    # try to load environment from save
-    # (sometimes this will fail because the environment could not be pickled)
-    try:
-        state = joblib.load(osp.join(fpath, 'vars'+itr+'.pkl'))
-        env = state['env']
-    except:
-        env = None
+    # load environment from config
+    config_path = osp.join(fpath, 'config.json')
+    with open(config_path) as f:
+        config = json.load(f)
+    env_name = config['env_name']
+    env = gym.make(env_name, render_mode="human")
 
     return env, get_action
 
