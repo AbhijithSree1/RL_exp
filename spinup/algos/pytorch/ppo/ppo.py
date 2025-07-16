@@ -6,7 +6,7 @@ import gymnasium as gym
 import time
 # Note: The 'core' import might be different in your version, adjust if needed.
 # e.g., import spinup.algos.pytorch.ppo.core as core
-import spinup.algos.pytorch.core as core
+import spinup.algos.pytorch.ppo.core as core
 from spinup.utils.logx import EpochLogger
 
 
