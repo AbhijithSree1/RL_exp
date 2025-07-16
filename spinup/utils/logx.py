@@ -13,7 +13,7 @@ import numpy as np
 import torch
 import os.path as osp, time, atexit, os
 import warnings
-from spinup.utils.mpi_tools import proc_id, mpi_statistics_scalar
+#from spinup.utils.mpi_tools import proc_id, mpi_statistics_scalar
 from spinup.utils.serialization_utils import convert_json
 
 color2num = dict(
@@ -365,7 +365,8 @@ class EpochLogger(Logger):
         else:
             v = self.epoch_dict[key]
             vals = np.concatenate(v) if isinstance(v[0], np.ndarray) and len(v[0].shape)>0 else v
-            stats = mpi_statistics_scalar(vals, with_min_and_max=with_min_and_max)
+            #stats = mpi_statistics_scalar(vals, with_min_and_max=with_min_and_max)
+            stats = np.mean(vals, with_min_and_max=with_min_and_max)
             super().log_tabular(key if average_only else 'Average' + key, stats[0])
             if not(average_only):
                 super().log_tabular('Std'+key, stats[1])
@@ -380,4 +381,5 @@ class EpochLogger(Logger):
         """
         v = self.epoch_dict[key]
         vals = np.concatenate(v) if isinstance(v[0], np.ndarray) and len(v[0].shape)>0 else v
-        return mpi_statistics_scalar(vals)
+        #return mpi_statistics_scalar(vals)
+        return np.mean(vals)
