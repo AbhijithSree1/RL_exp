@@ -6,7 +6,7 @@ import time
 import spinup.algos.pytorch.ppo.core as core
 from spinup.utils.logx import EpochLogger
 #from spinup.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
-from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
+#from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
 
 
 class PPOBuffer:
@@ -85,13 +85,12 @@ class PPOBuffer:
 
 
 
-def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0, 
+def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
         vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=10):
     """
     Proximal Policy Optimization (by clipping), 
-
     with early stopping based on approximate KL
 
     Args:
@@ -159,19 +158,14 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
         gamma (float): Discount factor. (Always between 0 and 1.)
 
         clip_ratio (float): Hyperparameter for clipping in the policy objective.
-            Roughly: how far can the new policy go from the old policy while 
-            still profiting (improving the objective function)? The new policy 
-            can still go farther than the clip_ratio says, but it doesn't help
-            on the objective anymore. (Usually small, 0.1 to 0.3.) Typically
-            denoted by :math:`\epsilon`. 
+            Roughly corresponds to TRPO's trust region size. (Recommended: 0.2)
 
         pi_lr (float): Learning rate for policy optimizer.
 
         vf_lr (float): Learning rate for value function optimizer.
 
         train_pi_iters (int): Maximum number of gradient descent steps to take 
-            on policy loss per epoch. (Early stopping may cause optimizer
-            to take fewer than this.)
+            on policy loss per epoch. (Early stopping may cause fewer steps.)
 
         train_v_iters (int): Number of gradient descent steps to take on 
             value function per epoch.
@@ -192,15 +186,11 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     """
 
-    # Special function to avoid certain slowdowns from PyTorch + MPI combo.
-    #setup_pytorch_for_mpi()
-
     # Set up logger and save configuration
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
 
     # Random seed
-    seed += 10000 * proc_id()
     torch.manual_seed(seed)
     np.random.seed(seed)
 
@@ -212,16 +202,12 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
     # Create actor-critic module
     ac = actor_critic(env.observation_space, env.action_space, **ac_kwargs)
 
-    # Sync params across processes
-    #sync_params(ac)
-
     # Count variables
     var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.v])
     logger.log('\nNumber of parameters: \t pi: %d, \t v: %d\n'%var_counts)
 
     # Set up experience buffer
-    local_steps_per_epoch = int(steps_per_epoch / num_procs())
-    buf = PPOBuffer(obs_dim, act_dim, local_steps_per_epoch, gamma, lam)
+    buf = PPOBuffer(obs_dim, act_dim, steps_per_epoch, gamma, lam)
 
     # Set up function for computing PPO policy loss
     def compute_loss_pi(data):
@@ -265,14 +251,13 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
         for i in range(train_pi_iters):
             pi_optimizer.zero_grad()
             loss_pi, pi_info = compute_loss_pi(data)
-            kl = mpi_avg(pi_info['kl'])
+            kl = pi_info['kl']
             if kl > 1.5 * target_kl:
                 logger.log('Early stopping at step %d due to reaching max kl.'%i)
                 break
             loss_pi.backward()
-            #mpi_avg_grads(ac.pi)    # average grads across MPI processes
             pi_optimizer.step()
-
+        
         logger.store(StopIter=i)
 
         # Value function learning
@@ -280,7 +265,6 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             vf_optimizer.zero_grad()
             loss_v = compute_loss_v(data)
             loss_v.backward()
-            #mpi_avg_grads(ac.v)    # average grads across MPI processes
             vf_optimizer.step()
 
         # Log changes from update
@@ -292,17 +276,13 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     # Prepare for interaction with environment
     start_time = time.time()
-    # o, ep_ret, ep_len = env.reset(), 0, 0
     (o, _), ep_ret, ep_len = env.reset(), 0, 0
-
-
 
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
-        for t in range(local_steps_per_epoch):
+        for t in range(steps_per_epoch):
             a, v, logp = ac.step(torch.as_tensor(o, dtype=torch.float32))
 
-            # next_o, r, d, _ = env.step(a)
             next_o, r, terminated, truncated, _ = env.step(a)
             d = terminated or truncated
             ep_ret += r
@@ -317,7 +297,7 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
             timeout = ep_len == max_ep_len
             terminal = d or timeout
-            epoch_ended = t==local_steps_per_epoch-1
+            epoch_ended = t==steps_per_epoch-1
 
             if terminal or epoch_ended:
                 if epoch_ended and not(terminal):
@@ -331,11 +311,7 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
                     logger.store(EpRet=ep_ret, EpLen=ep_len)
-                # o, ep_ret, ep_len = env.reset(), 0, 0
                 (o, _), ep_ret, ep_len = env.reset(), 0, 0
-
-
-
 
         # Save model
         if (epoch % save_freq == 0) or (epoch == epochs-1):
@@ -358,8 +334,7 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('KL', average_only=True)
         logger.log_tabular('ClipFrac', average_only=True)
         logger.log_tabular('StopIter', average_only=True)
-        logger.log_tabular('Time', time.time()-start_time)
-        logger.dump_tabular()
+        logger.log_
 
 if __name__ == '__main__':
     import argparse
