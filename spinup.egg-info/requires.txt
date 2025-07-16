@@ -1,5 +1,5 @@
 cloudpickle
-gym[atari,box2d,classic_control]
+gymnasium[atari,box2d,classic_control]
 ipython
 joblib
 matplotlib
@@ -10,6 +10,5 @@ pytest
 psutil
 scipy
 seaborn
-tensorflow
 torch
 tqdm

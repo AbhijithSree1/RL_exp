@@ -3,7 +3,7 @@ from spinup.user_config import DEFAULT_BACKEND
 from spinup.utils.run_utils import ExperimentGrid
 from spinup.utils.serialization_utils import convert_json
 import argparse
-import gym
+import gymnasium as gym
 import json
 import os, subprocess, sys
 import os.path as osp
@@ -169,6 +169,7 @@ def parse_and_execute_grid_search(cmd, args):
                 * View the complete list of valid Gym environments at
 
                     https://gym.openai.com/envs/
+                         https://gymnasium.farama.orgénvironments/
 
             """%env_name)
         assert env_name in valid_envs, err_msg

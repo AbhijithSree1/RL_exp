@@ -5,7 +5,7 @@ Summary: Teaching tools for introducing people to deep RL.
 Author: Joshua Achiam
 License-File: LICENSE
 Requires-Dist: cloudpickle
-Requires-Dist: gym[atari,box2d,classic_control]
+Requires-Dist: gymnasium[atari,box2d,classic_control]
 Requires-Dist: ipython
 Requires-Dist: joblib
 Requires-Dist: matplotlib
@@ -16,6 +16,5 @@ Requires-Dist: pytest
 Requires-Dist: psutil
 Requires-Dist: scipy
 Requires-Dist: seaborn
-Requires-Dist: tensorflow
 Requires-Dist: torch
 Requires-Dist: tqdm

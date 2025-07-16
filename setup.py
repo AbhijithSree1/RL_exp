@@ -15,7 +15,7 @@ setup(
     version=__version__,#'0.1',
     install_requires=[
         'cloudpickle',
-        'gym[atari,box2d,classic_control]',
+        'gymnasium[atari,box2d,classic_control]',
         'ipython',
         'joblib',
         'matplotlib',
@@ -26,7 +26,7 @@ setup(
         'psutil',
         'scipy',
         'seaborn',
-        #'tensorflow',
+        #todo add support for current 'tensorflow',
         'torch',
         'tqdm'
     ],

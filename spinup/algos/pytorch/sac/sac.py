@@ -3,7 +3,7 @@ import itertools
 import numpy as np
 import torch
 from torch.optim import Adam
-import gym
+import gymnasium as gym
 import time
 import spinup.algos.pytorch.sac.core as core
 from spinup.utils.logx import EpochLogger
@@ -40,16 +40,13 @@ class ReplayBuffer:
                      done=self.done_buf[idxs])
         return {k: torch.as_tensor(v, dtype=torch.float32) for k,v in batch.items()}
 
-
-
-def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0, 
-        steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, 
-        polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
-        update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, 
+def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
+        steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99,
+        polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000,
+        update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000,
         logger_kwargs=dict(), save_freq=1):
     """
     Soft Actor-Critic (SAC)
-
 
     Args:
         env_fn : A function which creates a copy of the environment.
@@ -264,15 +261,16 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
                 p_targ.data.add_((1 - polyak) * p.data)
 
     def get_action(o, deterministic=False):
-        return ac.act(torch.as_tensor(o, dtype=torch.float32), 
+        return ac.act(torch.as_tensor(o, dtype=torch.float32),
                       deterministic)
 
     def test_agent():
         for j in range(num_test_episodes):
-            o, d, ep_ret, ep_len = test_env.reset(), False, 0, 0
+            (o, _), d, ep_ret, ep_len = test_env.reset(), False, 0, 0
             while not(d or (ep_len == max_ep_len)):
-                # Take deterministic actions at test time 
-                o, r, d, _ = test_env.step(get_action(o, True))
+                # Take deterministic actions at test time
+                o, r, terminated, truncated, _ = test_env.step(get_action(o, True))
+                d = terminated or truncated
                 ep_ret += r
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
@@ -280,40 +278,39 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
     # Prepare for interaction with environment
     total_steps = steps_per_epoch * epochs
     start_time = time.time()
-    o, ep_ret, ep_len = env.reset(), 0, 0
+    (o, _), ep_ret, ep_len = env.reset(), 0, 0
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
         
         # Until start_steps have elapsed, randomly sample actions
         # from a uniform distribution for better exploration. Afterwards, 
-        # use the learned policy. 
+        # use the learned policy.
         if t > start_steps:
             a = get_action(o)
         else:
             a = env.action_space.sample()
 
         # Step the env
-        o2, r, d, _ = env.step(a)
+        o2, r, terminated, truncated, _ = env.step(a)
         ep_ret += r
         ep_len += 1
 
-        # Ignore the "done" signal if it comes from hitting the time
-        # horizon (that is, when it's an artificial terminal signal
-        # that isn't based on the agent's state)
-        d = False if ep_len==max_ep_len else d
+        # The done signal for the replay buffer should be based on termination,
+        # not truncation, as per the original SAC implementation.
+        d = terminated
 
         # Store experience to replay buffer
         replay_buffer.store(o, a, r, o2, d)
 
-        # Super critical, easy to overlook step: make sure to update 
+        # Super critical, easy to overlook step: make sure to update
         # most recent observation!
         o = o2
 
         # End of trajectory handling
-        if d or (ep_len == max_ep_len):
+        if terminated or truncated or (ep_len == max_ep_len):
             logger.store(EpRet=ep_ret, EpLen=ep_len)
-            o, ep_ret, ep_len = env.reset(), 0, 0
+            (o, _), ep_ret, ep_len = env.reset(), 0, 0
 
         # Update handling
         if t >= update_after and t % update_every == 0:

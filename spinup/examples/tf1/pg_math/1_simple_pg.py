@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
-import gym
-from gym.spaces import Discrete, Box
+import gymnasium as gym
+from gymnasium.spaces import Discrete, Box  # UPDATED import
 
 def mlp(x, sizes, activation=tf.tanh, output_activation=None):
     # Build a feedforward neural network.
@@ -9,11 +9,13 @@ def mlp(x, sizes, activation=tf.tanh, output_activation=None):
         x = tf.layers.dense(x, units=size, activation=activation)
     return tf.layers.dense(x, units=sizes[-1], activation=output_activation)
 
-def train(env_name='CartPole-v0', hidden_sizes=[32], lr=1e-2, 
+def train(env_name='CartPole-v0', hidden_sizes=[32], lr=1e-2,
           epochs=50, batch_size=5000, render=False):
 
-    # make environment, check spaces, get obs / act dims
-    env = gym.make(env_name)
+    # UPDATED: Set render_mode to 'human' if render is True
+    render_mode = "human" if render else None
+    env = gym.make(env_name, render_mode=render_mode)
+
     assert isinstance(env.observation_space, Box), \
         "This example only works for envs with continuous state spaces."
     assert isinstance(env.action_space, Discrete), \
@@ -52,7 +54,7 @@ def train(env_name='CartPole-v0', hidden_sizes=[32], lr=1e-2,
         batch_lens = []         # for measuring episode lengths
 
         # reset episode-specific variables
-        obs = env.reset()       # first obs comes from starting distribution
+        obs, _ = env.reset()    # UPDATED: env.reset() returns a tuple
         done = False            # signal from environment that episode is over
         ep_rews = []            # list for rewards accrued throughout ep
 
@@ -71,7 +73,10 @@ def train(env_name='CartPole-v0', hidden_sizes=[32], lr=1e-2,
 
             # act in the environment
             act = sess.run(actions, {obs_ph: obs.reshape(1,-1)})[0]
-            obs, rew, done, _ = env.step(act)
+            
+            # UPDATED: env.step() returns 5 values
+            obs, rew, terminated, truncated, _ = env.step(act)
+            done = terminated or truncated
 
             # save action, reward
             batch_acts.append(act)
@@ -87,7 +92,8 @@ def train(env_name='CartPole-v0', hidden_sizes=[32], lr=1e-2,
                 batch_weights += [ep_ret] * ep_len
 
                 # reset episode-specific variables
-                obs, done, ep_rews = env.reset(), False, []
+                obs, _ = env.reset() # UPDATED: env.reset() returns a tuple
+                done, ep_rews = False, []
 
                 # won't render again this epoch
                 finished_rendering_this_epoch = True
@@ -99,9 +105,9 @@ def train(env_name='CartPole-v0', hidden_sizes=[32], lr=1e-2,
         # take a single policy gradient update step
         batch_loss, _ = sess.run([loss, train_op],
                                  feed_dict={
-                                    obs_ph: np.array(batch_obs),
-                                    act_ph: np.array(batch_acts),
-                                    weights_ph: np.array(batch_weights)
+                                     obs_ph: np.array(batch_obs),
+                                     act_ph: np.array(batch_acts),
+                                     weights_ph: np.array(batch_weights)
                                  })
         return batch_loss, batch_rets, batch_lens
 
@@ -109,7 +115,7 @@ def train(env_name='CartPole-v0', hidden_sizes=[32], lr=1e-2,
     for i in range(epochs):
         batch_loss, batch_rets, batch_lens = train_one_epoch()
         print('epoch: %3d \t loss: %.3f \t return: %.3f \t ep_len: %.3f'%
-                (i, batch_loss, np.mean(batch_rets), np.mean(batch_lens)))
+              (i, batch_loss, np.mean(batch_rets), np.mean(batch_lens)))
 
 if __name__ == '__main__':
     import argparse
