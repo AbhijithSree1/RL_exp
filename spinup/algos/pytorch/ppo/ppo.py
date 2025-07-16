@@ -5,7 +5,7 @@ import gymnasium as gym
 import time
 import spinup.algos.pytorch.ppo.core as core
 from spinup.utils.logx import EpochLogger
-from spinup.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
+#from spinup.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
 from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
 
 
@@ -193,7 +193,7 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
     """
 
     # Special function to avoid certain slowdowns from PyTorch + MPI combo.
-    setup_pytorch_for_mpi()
+    #setup_pytorch_for_mpi()
 
     # Set up logger and save configuration
     logger = EpochLogger(**logger_kwargs)
@@ -213,7 +213,7 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
     ac = actor_critic(env.observation_space, env.action_space, **ac_kwargs)
 
     # Sync params across processes
-    sync_params(ac)
+    #sync_params(ac)
 
     # Count variables
     var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.v])
@@ -270,7 +270,7 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
                 logger.log('Early stopping at step %d due to reaching max kl.'%i)
                 break
             loss_pi.backward()
-            mpi_avg_grads(ac.pi)    # average grads across MPI processes
+            #mpi_avg_grads(ac.pi)    # average grads across MPI processes
             pi_optimizer.step()
 
         logger.store(StopIter=i)
@@ -280,7 +280,7 @@ def ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             vf_optimizer.zero_grad()
             loss_v = compute_loss_v(data)
             loss_v.backward()
-            mpi_avg_grads(ac.v)    # average grads across MPI processes
+            #mpi_avg_grads(ac.v)    # average grads across MPI processes
             vf_optimizer.step()
 
         # Log changes from update
