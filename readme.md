@@ -61,10 +61,50 @@ You should see training logs and results in `./data/installtest_pytorch/`
 ---
 
 ### 6. Run a PPO Agent Walker
+This will tell gymnasium to use the modern mujoco engine and load the correct environment.
+
 ```bash
 python -m spinup.run ppo --env Walker2d-v4 --exp_name walker_pytorch
 ```
 You should see training logs and results in `./data/walker_pytorch/`
+
+Open this project in Visual Studio and you will notice the following new files in your /data/walker_pytorch/walker_pytorch_s0 folder. Each file serves a specific purpose for analyzing, plotting and re-running your trained agent. The following is a breakdown of what you do with each new file.
+
+## config.json
+What it is: A text file that saves all the hyperparameters and settings for that specific experiment (e.g., environment name, learning rate, network size).
+
+What you can do with it:
+
+Review Settings: Open it to see the exact configuration you used for a particular run.
+
+Reloading: The test_policy.py script automatically uses this file to know which environment to create when you test your trained agent.
+
+## progress.txt
+What it is: This is your primary data file. It's a tab-separated text file that logs all the key performance metrics for each epoch of training, such as AverageEpRet (Average Episode Return), StdEpRet, LossPi, and Entropy.
+
+What you can do with it:
+
+Plot Performance: This file is automatically read by the plot utility to generate your performance graphs.
+```bash
+python -m spinup.run plot path/to/your/experiment/
+```
+Custom Analysis: You can open it with a spreadsheet program like Excel or load it into a Python Pandas DataFrame for more detailed, custom analysis.
+
+## pyt_save/model.pt
+What it is: This is the most important file. It’s the "brain" of your agent. It contains the saved weights and parameters of your trained PyTorch neural network.
+
+What you can do with it:
+
+Watch Your Agent: Use the test_policy utility to load this file and watch your trained agent perform in the environment.
+```bash
+python -m spinup.run test_policy path/to/your/experiment/
+```
+
+## vars.pkl
+What it is: This is a pickle file that saves a snapshot of the training state. In the original TensorFlow version, this was critical for resuming training.
+
+What you can do with it: For your modernized PyTorch workflow, this file is generally not needed. The test_policy script relies on config.json and model.pt to load and run your agent. You can safely focus on the other three files.
+
 
 ---
 
