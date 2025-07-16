@@ -52,11 +52,19 @@ pip install "gymnasium[mujoco]"
 pip install -e .
 ```
 
-### 5. Run a PPO Agent
+### 5. Run a PPO Agent LunarLander
 ```bash
-python -m spinup.run ppo --env LunarLander-v2 --exp_name test-ppo-lander
+python -m spinup.run ppo --hid "[32,32]" --env LunarLander-v3 --exp_name installtest_pytorch --gamma 0.999
 ```
-You should see training logs and results in `./data/test-ppo-lander/`
+You should see training logs and results in `./data/installtest_pytorch/`
+
+---
+
+### 6. Run a PPO Agent Walker
+```bash
+python -m spinup.run ppo --env Walker2d-v4 --exp_name walker_pytorch
+```
+You should see training logs and results in `./data/walker_pytorch/`
 
 ---
 

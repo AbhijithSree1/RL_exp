@@ -2,21 +2,21 @@
     "ac_kwargs":	{},
     "actor_critic":	"MLPActorCritic",
     "clip_ratio":	0.2,
-    "env_fn":	"<function call_experiment.<locals>.thunk_plus.<locals>.<lambda> at 0x000001F9C7F09700>",
+    "env_fn":	"<function call_experiment.<locals>.thunk_plus.<locals>.<lambda> at 0x0000019991279790>",
     "epochs":	50,
     "exp_name":	"walker",
     "gamma":	0.99,
     "lam":	0.97,
     "logger":	{
-        "<spinup.utils.logx.EpochLogger object at 0x000001F9C801CC10>":	{
+        "<spinup.utils.logx.EpochLogger object at 0x000001999158EC70>":	{
             "epoch_dict":	{},
             "exp_name":	"walker",
             "first_row":	true,
             "log_current_row":	{},
             "log_headers":	[],
-            "output_dir":	"I:\\OPENAI_RESEARCH\\spinningup\\data\\walker\\walker_s0",
+            "output_dir":	"I:\\OPENAI_RESEARCH\\Github\\spinningup\\data\\walker\\walker_s0",
             "output_file":	{
-                "<_io.TextIOWrapper name='I:\\\\OPENAI_RESEARCH\\\\spinningup\\\\data\\\\walker\\\\walker_s0\\\\progress.txt' mode='w' encoding='cp1252'>":	{
+                "<_io.TextIOWrapper name='I:\\\\OPENAI_RESEARCH\\\\Github\\\\spinningup\\\\data\\\\walker\\\\walker_s0\\\\progress.txt' mode='w' encoding='cp1252'>":	{
                     "mode":	"w"
                 }
             }
@@ -24,7 +24,7 @@
     },
     "logger_kwargs":	{
         "exp_name":	"walker",
-        "output_dir":	"I:\\OPENAI_RESEARCH\\spinningup\\data\\walker\\walker_s0"
+        "output_dir":	"I:\\OPENAI_RESEARCH\\Github\\spinningup\\data\\walker\\walker_s0"
     },
     "max_ep_len":	1000,
     "pi_lr":	0.0003,
