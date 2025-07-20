@@ -2,13 +2,13 @@
     "ac_kwargs":	{},
     "actor_critic":	"MLPActorCritic",
     "clip_ratio":	0.2,
-    "env_fn":	"<function call_experiment.<locals>.thunk_plus.<locals>.<lambda> at 0x000002030A94A790>",
+    "env_fn":	"<function call_experiment.<locals>.thunk_plus.<locals>.<lambda> at 0x000001B2CBF49790>",
     "epochs":	50,
     "exp_name":	"walker_pytorch",
     "gamma":	0.99,
     "lam":	0.97,
     "logger":	{
-        "<spinup.utils.logx.EpochLogger object at 0x000002030AA5EC70>":	{
+        "<spinup.utils.logx.EpochLogger object at 0x000001B2CC25EC10>":	{
             "epoch_dict":	{},
             "exp_name":	"walker_pytorch",
             "first_row":	true,

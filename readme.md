@@ -70,6 +70,10 @@ You should see training logs and results in `./data/walker_pytorch/`
 
 Open this project in Visual Studio and you will notice the following new files in your /data/walker_pytorch/walker_pytorch_s0 folder. Each file serves a specific purpose for analyzing, plotting and re-running your trained agent. The following is a breakdown of what you do with each new file.
 
+### 7. Run more Experiments
+Review this repository’s discussions for more experiments
+https://github.com/monigarr/spinningup/discussions/7 
+
 ## config.json
 What it is: A text file that saves all the hyperparameters and settings for that specific experiment (e.g., environment name, learning rate, network size).
 
