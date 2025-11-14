@@ -5,9 +5,10 @@ import os.path as osp
 import tensorflow as tf
 import torch
 from spinup import EpochLogger
-from spinup.utils.logx import restore_tf_graph
+# from spinup.utils.logx import restore_tf_graph
 import gymnasium as gym
 import json
+import numpy as np
 
 
 def load_policy_and_env(fpath, itr='last', deterministic=False):
@@ -28,6 +29,7 @@ def load_policy_and_env(fpath, itr='last', deterministic=False):
     else:
         backend = 'pytorch'
 
+    print(backend)
     # handle which epoch to load from
     if itr=='last':
         # check filenames for epoch (AKA iteration) numbers, find maximum value
@@ -96,12 +98,18 @@ def load_pytorch_policy(fpath, itr, deterministic=False):
     fname = osp.join(fpath, 'pyt_save', 'model'+itr+'.pt')
     print('\n\nLoading from %s.\n\n'%fname)
 
-    model = torch.load(fname)
+    model = torch.load(fname, weights_only=False)
 
     # make function for producing an action given a single state
     def get_action(x):
+
+        if isinstance(x, tuple):
+            x = x[0]
+    
+        # x = np.asarray(x, dtype=np.float32).reshape(1, -1)
+        # x = torch.from_numpy(x)
         with torch.no_grad():
-            x = torch.as_tensor(x, dtype=torch.float32)
+            x = torch.as_tensor(np.array(x), dtype=torch.float32)
             action = model.act(x)
         return action
 
@@ -116,14 +124,14 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True):
         "page on Experiment Outputs for how to handle this situation."
 
     logger = EpochLogger()
-    o, r, d, ep_ret, ep_len, n = env.reset(), 0, False, 0, 0, 0
+    r, d, ep_ret, ep_len, n = 0, False, 0, 0, 0
+    o, _ = env.reset()
     while n < num_episodes:
-        if render:
-            env.render()
-            time.sleep(1e-3)
 
         a = get_action(o)
-        o, r, d, _ = env.step(a)
+        o, r, terminated, truncated, _ = env.step(a)
+        d = terminated or truncated
+        # print(d)
         ep_ret += r
         ep_len += 1
 

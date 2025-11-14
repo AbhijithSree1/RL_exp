@@ -1,4 +1,4 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: spinup
 Version: 0.2.0
 Summary: Teaching tools for introducing people to deep RL.
@@ -9,7 +9,6 @@ Requires-Dist: gymnasium[atari,box2d,classic_control]
 Requires-Dist: ipython
 Requires-Dist: joblib
 Requires-Dist: matplotlib
-Requires-Dist: mpi4py
 Requires-Dist: numpy
 Requires-Dist: pandas
 Requires-Dist: pytest
@@ -18,3 +17,7 @@ Requires-Dist: scipy
 Requires-Dist: seaborn
 Requires-Dist: torch
 Requires-Dist: tqdm
+Dynamic: author
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: summary

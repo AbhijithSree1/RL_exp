@@ -26,8 +26,9 @@ def colorize(string, color, bold=False, highlight=False):
 class Logger:
     """General-purpose logger with terminal and file output."""
 
-    def __init__(self, output_dir=None, output_fname='progress.txt', exp_name=None):
+    def __init__(self, output_dir=None, output_fname='progress.txt', exp_name=None, env_name=None):
         self.exp_name = exp_name
+        self.env_name = env_name
         self.first_row = True
         self.log_headers = []
         self.log_current_row = {}
@@ -93,6 +94,7 @@ class Logger:
         config_json = convert_json(config)
         if self.exp_name:
             config_json['exp_name'] = self.exp_name
+            config_json['env_name'] = self.env_name
         if proc_id() == 0:
             try:
                 output = json.dumps(config_json, indent=4, sort_keys=True)
@@ -110,7 +112,11 @@ class Logger:
                 joblib.dump(state_dict, osp.join(self.output_dir, fname))
             except Exception as e:
                 self.log(f"Warning: could not pickle state_dict: {e}", color='red')
-
+            if hasattr(self, 'tf_saver_elements'):
+                self._tf_simple_save(itr)
+            if hasattr(self, 'pytorch_saver_elements'):
+                self._pytorch_simple_save(itr)
+                
     def setup_pytorch_saver(self, model):
         self.pytorch_saver_elements = model
 
@@ -145,7 +151,12 @@ class EpochLogger(Logger):
             if key not in self.epoch_dict:
                 raise KeyError(f"No stored values for key: {key}")
             vals = self.epoch_dict[key]
-            vals = np.concatenate(vals) if isinstance(vals[0], np.ndarray) else vals
+            # vals = np.concatenate(vals) if isinstance(vals[0], np.ndarray) else vals
+            if isinstance(vals[0], np.ndarray):
+                arrs = [np.atleast_1d(v) for v in vals]
+                vals = np.concatenate(arrs) if len(arrs) else np.array([])
+            else:
+                vals = np.array(vals)         
             stats = mpi_statistics_scalar(vals, with_min_and_max)
             super().log_tabular(key if average_only else f"Average{key}", stats[0])
             if not average_only:

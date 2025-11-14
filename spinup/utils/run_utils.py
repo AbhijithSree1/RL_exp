@@ -22,7 +22,7 @@ import zlib
 
 DIV_LINE_WIDTH = 80
 
-def setup_logger_kwargs(exp_name, seed=None, data_dir=None, datestamp=False):
+def setup_logger_kwargs(exp_name, env_name, seed=None, data_dir=None, datestamp=False):
     """
     Sets up the output_dir for a logger and returns a dict for logger kwargs.
 
@@ -82,7 +82,8 @@ def setup_logger_kwargs(exp_name, seed=None, data_dir=None, datestamp=False):
 
     data_dir = data_dir or DEFAULT_DATA_DIR
     logger_kwargs = dict(output_dir=osp.join(data_dir, relpath), 
-                         exp_name=exp_name)
+                         exp_name=exp_name,
+                         env_name=env_name)
     return logger_kwargs
 
 
@@ -143,7 +144,8 @@ def call_experiment(exp_name, thunk, seed=0, num_cpu=1, data_dir=None,
 
     # Set up logger output directory
     if 'logger_kwargs' not in kwargs:
-        kwargs['logger_kwargs'] = setup_logger_kwargs(exp_name, seed, data_dir, datestamp)
+        env_name = kwargs['env_name'] if 'env_name' in kwargs else None
+        kwargs['logger_kwargs'] = setup_logger_kwargs(exp_name, env_name, seed, data_dir, datestamp)
     else:
         print('Note: Call experiment is not handling logger_kwargs.\n')
 

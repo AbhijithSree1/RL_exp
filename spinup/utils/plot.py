@@ -161,7 +161,7 @@ def make_plots(all_logdirs, legend=None, xaxis=None, values=None, count=False,
     for value in values:
         plt.figure()
         plot_data(data, xaxis=xaxis, value=value, condition=condition, smooth=smooth, estimator=estimator)
-    plt.savefig('images/performance_plot.png')
+    plt.savefig('Images/performance_plot.png')
     plt.show()
 
 
