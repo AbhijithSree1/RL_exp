@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch.optim import Adam
+from torch.optim.lr_scheduler import CosineAnnealingLR
 import gymnasium as gym
 import time
 # Note: The 'core' import might be different in your version, adjust if needed.
@@ -59,10 +60,15 @@ class OPGBuffer:
     def reset(self):
         self.ptr, self.path_start_idx = 0, 0
 
+MAX_TRANSITIONS = 10000          # keep only the most recent N transitions
+obs_all = None
+act_all = None
+next_obs_all = None
+rew_all = None
 
-def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dict(), seed=0,
-        steps_per_epoch=4000, max_imagine_steps=1000, epochs=50, obs_epochs = 5, imagine_epochs = 5, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-        vf_lr=1e-3, obs_lr = 7e-4, rew_lr = 7e-4, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
+def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dict(), seed=42,
+        steps_per_epoch=4000, max_imagine_steps=200, epochs=50, obs_epochs = 50, imagine_epochs = 2, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
+        vf_lr=1e-3, obs_lr = 1e-3, rew_lr = 1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=10):
 
     """
@@ -87,13 +93,14 @@ def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dic
     env = env_fn()
     obs_dim = env.observation_space.shape
     act_dim = env.action_space.shape
+    env.action_space.seed(seed)
 
     # Create actor-critic module
     ac = actor_critic_observer(env.observation_space, env.action_space, **ac_kwargs)
 
     # Count variables
-    var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.v, ac.observer])
-    logger.log('\nNumber of parameters: \t pi: %d, \t v: %d, \t obs: %d\n'%var_counts)
+    var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.v, ac.observer, ac.rlearner])
+    logger.log('\nNumber of parameters: \t pi: %d, \t v: %d, \t obs: %d, \t reward: %d\n'%var_counts)
 
     # Set up experience buffer
     buf = OPGBuffer(obs_dim, act_dim, steps_per_epoch, gamma, lam)
@@ -125,10 +132,11 @@ def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dic
     obs_optimizer = Adam(ac.observer.parameters(), lr=obs_lr)
     rlearn_optimizer = Adam(ac.rlearner.parameters(), lr=rew_lr)
     loss_fn = torch.nn.MSELoss(reduction="mean")
+    pi_scheduler = CosineAnnealingLR(pi_optimizer, T_max=100, eta_min=1e-8)
 
     logger.setup_pytorch_saver(ac)
 
-    def update(data):
+    def update(data,imagine=False):
 
         pi_l_old, pi_info_old = compute_loss_pi(data)
         pi_l_old = pi_l_old.item()
@@ -144,15 +152,18 @@ def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dic
                 break
             loss_pi.backward()
             pi_optimizer.step()
-        
         logger.store(StopIter=i)
 
         # Value function learning
-        for i in range(train_v_iters):
-            vf_optimizer.zero_grad()
-            loss_v = compute_loss_v(data)
-            loss_v.backward()
-            vf_optimizer.step()
+        if imagine == False:
+            for i in range(train_v_iters):
+                vf_optimizer.zero_grad()
+                loss_v = compute_loss_v(data)
+                loss_v.backward()
+                vf_optimizer.step()
+        else:
+            loss_v = torch.as_tensor(v_l_old)   # No value update during imagined steps
+        
 
         # Log changes from update
         kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
@@ -160,69 +171,99 @@ def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dic
                      KL=kl, Entropy=ent, ClipFrac=cf,
                      DeltaLossPi=(loss_pi.item() - pi_l_old),
                      DeltaLossV=(loss_v.item() - v_l_old))
+
+   
+
+    
+
+    def _append_and_trim(store, x, max_len):
+        if store is None:
+            store = x
+        else:
+            store = torch.cat([store, x], dim=0)
+        if store.shape[0] > max_len:
+            store = store[-max_len:]  # drop oldest
+        return store
+    # ---- storages (tensors, not lists) ----
+    
+
+    def TrainObserver(obs_epochs, data):
         
-    def TrainObserver(obs_epochs):
-        data = buf.get()
+        global obs_all, act_all, next_obs_all, rew_all
+
         obs = data['obs'][:-1]
         act = data['act'][:-1]
         next_obs = data['obs'][1:]
-        rew = data['rew'][:1]
-        epoch = 0
+        rew = data['rew'][1:]
+        obs_all      = _append_and_trim(obs_all,      obs,      MAX_TRANSITIONS)
+        act_all      = _append_and_trim(act_all,      act,      MAX_TRANSITIONS)
+        next_obs_all = _append_and_trim(next_obs_all, next_obs, MAX_TRANSITIONS)
+        rew_all      = _append_and_trim(rew_all,      rew,      MAX_TRANSITIONS)
         average_loss_obs = 0
         average_loss_rlearn = 0
-        while epoch < obs_epochs:   
-            epoch += 1  
+        for epoch in range(obs_epochs):
+
+            # observer update 
             obs_optimizer.zero_grad()
-            pi,_ = ac.observer(obs, act)
+            pi,_ = ac.observer(obs_all, act_all)
             # Negative log likelihood
-            loss_obs = -(pi.log_prob(next_obs).sum(-1)).mean()
+            loss_obs = -(pi.log_prob(next_obs_all).sum(-1)).mean()
             loss_obs.backward()
             obs_optimizer.step()
             average_loss_obs += loss_obs.item()
-            average_loss_obs /= epoch
+            average_loss_obs /= (epoch+1)
 
+            # reward learner update
             rlearn_optimizer.zero_grad()
-            pred_rew = ac.rlearner(next_obs)
-            loss_rlearn = loss_fn(pred_rew, rew)
+            pred_rew = ac.rlearner(obs_all, act_all, next_obs_all)
+            loss_rlearn = loss_fn(pred_rew, rew_all)
             loss_rlearn.backward()
             rlearn_optimizer.step()
-            average_loss_rlearn += loss_rlearn.item()
-            average_loss_rlearn /= epoch
 
-            print('Observer Epoch: ', epoch, ' Loss: ', average_loss_obs, ' Reward Learner Loss: ', average_loss_rlearn)
+            # running average
+            average_loss_rlearn += loss_rlearn.item()
+            average_loss_rlearn /= (epoch+1)
+
+            # print('Observer Epoch: ', epoch, ' Loss: ', average_loss_obs, ' Reward Learner Loss: ', average_loss_rlearn)
         logger.store(ObsAvgLoss=average_loss_obs)
         logger.store(RLearnAvgLoss=average_loss_rlearn)
 
-    def imagine_step():
-        data = buf.get()
+    def imagine_step(data):
+
         buf_imagine = OPGBuffer(obs_dim, act_dim, max_imagine_steps, gamma, lam)
-        imagine_epoch = 0
-        while imagine_epoch < imagine_epochs:
-            imagine_epoch += 1
+        for _ in range(imagine_epochs):
             index = np.random.randint(0, data['obs'].shape[0]-1)
             
-            obs, act = data['obs'][index], data['act'][index]   # take random initial sample from buffer
+            obs = data['obs'][index]   # take random initial sample from buffer
 
             with torch.no_grad():
-                for i in range(max_imagine_steps):                           # imagine for 1000 steps
-                    # print(i)
-                    pi,_ = ac.observer(obs.unsqueeze(0), act.unsqueeze(0))    # predict next state prop dist from current state and action
-                    obs_next = pi.sample().squeeze(0)                           # sample next state
-                    rew = ac.rlearner(obs_next.unsqueeze(0)).squeeze()                      # predict reward from next state
-                    a, v, logp = ac.step(obs_next)                           # get action from policy    
-                    # print(obs_next, act, rew, v, logp)
-                    buf_imagine.store(obs_next, act, rew, v, logp)
-                    obs = obs_next
+                for _ in range(max_imagine_steps):                           # imagine for "X" steps
+                    
+                    # policy on current obs to get action
+                    a, v, logp = ac.step(obs)
                     act = torch.as_tensor(a, dtype=torch.float32)
 
-            buf_imagine.finish_path(v)
+                    # get next state from observer and reward from reward learner 
+                    pi,_ = ac.observer(obs.unsqueeze(0), act.unsqueeze(0))    # predict next state prop dist from current state and action
+                    obs_next = pi.sample().squeeze(0)                           # sample next state
+                    rew = ac.rlearner(obs.unsqueeze(0), act.unsqueeze(0), obs_next.unsqueeze(0)).squeeze()                      # predict reward from next state
+                    
+                    # store in imagine buffer
+                    buf_imagine.store(obs, a, rew, v, logp)
+
+                    # adavance to next state
+                    obs = obs_next
+
+            # bootstrap with V(last_state)
+            _, v_last, _ = ac.step(obs)
+            buf_imagine.finish_path(v_last)
             data_imagine = buf_imagine.get()
-            update(data_imagine)
+            update(data_imagine,imagine=True)   # update using imagined data
             buf_imagine.reset()
 
     start_time = time.time()
-    (o, _), ep_ret, ep_len = env.reset(), 0, 0
-    obs_warmup_epochs = 2
+    (o, _), ep_ret, ep_len = env.reset(seed=seed), 0, 0
+    obs_warmup_epochs = 31
 
     for epoch in range(epochs):
         for t in range(steps_per_epoch):
@@ -257,12 +298,18 @@ def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dic
         if (epoch % save_freq == 0) or (epoch == epochs-1):
             logger.save_state({'env': env}, None)
 
-        TrainObserver(obs_epochs)
         data = buf.get()
-        update(data)  
+        TrainObserver(obs_epochs,data)
+        update(data, imagine=False)  
         if epoch > obs_warmup_epochs:
-            print('Imagining steps and updating policy...')
-            imagine_step()
+            if epoch % 2 == 0:
+                print('Imagining steps and updating policy...')
+                imagine_step(data)
+        
+        if pi_optimizer.param_groups[0]['lr'] > 1e-8: # reduce to 1e-8 and stay there #bm_2
+            pi_scheduler.step()
+            print('Policy Learning Rate: ', pi_optimizer.param_groups[0]['lr']) #bm_1 always changing scheduler
+
         buf.reset()
         
 

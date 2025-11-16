@@ -139,12 +139,13 @@ class MLPCritic(nn.Module):
 
 class MLPRewardLearner(nn.Module):
 
-    def __init__(self, obs_dim, hidden_sizes, activation):
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation):
         super().__init__()
-        self.r_net = mlp([obs_dim] + list(hidden_sizes) + [1], activation)
+        self.r_net = mlp([obs_dim + act_dim + obs_dim] + list(hidden_sizes) + [1], activation)
 
-    def forward(self, obs):
-        return torch.squeeze(self.r_net(obs), -1) # Critical to ensure r has right shape.
+    def forward(self, obs, act, next_obs):
+        input = torch.cat([obs, act, next_obs], dim=-1)   #
+        return torch.squeeze(self.r_net(input), -1) # Critical to ensure r has right shape.
 
 class MLPActorCriticObserver(nn.Module):
 
@@ -164,7 +165,7 @@ class MLPActorCriticObserver(nn.Module):
 
         if isinstance(action_space, Box):
             self.observer = MLPGaussianObserver(obs_dim, act_dim, hidden_sizes, activation)
-            self.rlearner = MLPRewardLearner(obs_dim, hidden_sizes, activation)
+            self.rlearner = MLPRewardLearner(obs_dim, act_dim, hidden_sizes, activation)
         elif isinstance(action_space, Discrete):
             raise NotImplementedError("Observer for discrete action space not implemented")
 
