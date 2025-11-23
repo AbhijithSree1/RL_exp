@@ -67,7 +67,7 @@ next_obs_all = None
 rew_all = None
 
 def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dict(), seed=42,
-        steps_per_epoch=4000, max_imagine_steps=200, epochs=50, obs_epochs = 50, imagine_epochs = 2, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
+        steps_per_epoch=4000, max_imagine_steps=10000, epochs=50, obs_epochs = 50, imagine_epochs = 2, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
         vf_lr=1e-3, obs_lr = 1e-3, rew_lr = 1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=10):
 
@@ -271,7 +271,7 @@ def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dic
 
             next_o, r, terminated, truncated, _ = env.step(a)
             d = terminated or truncated
-            ep_ret += r
+            ep_ret += float(r)
             ep_len += 1
 
             buf.store(o, a, r, v, logp)
@@ -306,7 +306,11 @@ def opg(env_fn, actor_critic_observer=core.MLPActorCriticObserver, ac_kwargs=dic
                 print('Imagining steps and updating policy...')
                 imagine_step(data)
         
-        if pi_optimizer.param_groups[0]['lr'] > 1e-8: # reduce to 1e-8 and stay there #bm_2
+        # if pi_optimizer.param_groups[0]['lr'] > 1e-8: # reduce to 1e-8 and stay there #bm_2
+        #     pi_scheduler.step()
+        #     print('Policy Learning Rate: ', pi_optimizer.param_groups[0]['lr']) #bm_1 always changing scheduler
+
+        if epoch > 100:
             pi_scheduler.step()
             print('Policy Learning Rate: ', pi_optimizer.param_groups[0]['lr']) #bm_1 always changing scheduler
 

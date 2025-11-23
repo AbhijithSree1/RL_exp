@@ -141,7 +141,8 @@ class EpochLogger(Logger):
     def store(self, **kwargs):
         for k, v in kwargs.items():
             if not isinstance(v, (int, float, np.ndarray)):
-                raise ValueError(f"Unsupported type for logging: {type(v)}")
+                # raise ValueError(f"Unsupported type for logging: {type(v)}")
+                v = float(v)
             self.epoch_dict.setdefault(k, []).append(v)
 
     def log_tabular(self, key, val=None, with_min_and_max=False, average_only=False):
